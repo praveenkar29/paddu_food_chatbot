@@ -4,10 +4,11 @@ from psycopg2 import sql
 import os
 
 cnx = psycopg2.connect(
-    host=os.getenv("DB_HOST"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    database=os.getenv("DB_NAME")
+    host="dpg-cqr2tgo8fa8c73fmvv6g-a.oregon-postgres.render.com",
+    database="paddu_eatery",
+    user="paddu_eatery_user",
+    password="K2t2eoukwsd4zi2IgNuNGC22GlaFePVT",
+    port="5432"
 )
 
 # Function to call the PostgreSQL stored procedure and insert an order item

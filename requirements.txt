@@ -41,4 +41,6 @@ websockets==12.0
 wheel==0.43.0
 gunicorn==20.1.0
 psycopg2
+psycopg2-binary
+
 
