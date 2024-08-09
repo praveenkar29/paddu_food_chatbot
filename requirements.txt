@@ -40,4 +40,5 @@ watchfiles==0.22.0
 websockets==12.0
 wheel==0.43.0
 gunicorn==20.1.0
+psycopg2
 
