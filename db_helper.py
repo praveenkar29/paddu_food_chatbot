@@ -1,118 +1,194 @@
-# Import the psycopg2 library for PostgreSQL
 import psycopg2
-from psycopg2 import sql
+from psycopg2 import pool
 import os
+from dotenv import load_dotenv
 
-cnx = psycopg2.connect(
-    host="dpg-cqr2tgo8fa8c73fmvv6g-a.oregon-postgres.render.com",
-    database="paddu_eatery",
-    user="paddu_eatery_user",
-    password="K2t2eoukwsd4zi2IgNuNGC22GlaFePVT",
-    port="5432"
-)
+# Load environment variables from .env file
+load_dotenv()
+print(os.getenv("DB_HOST"))
+print(os.getenv("DB_USER"))
+# etc.
 
-# Function to call the PostgreSQL stored procedure and insert an order item
+# Database connection details
+db_pool = None
+
+try:
+    db_pool = psycopg2.pool.SimpleConnectionPool(
+        1, 10,
+        host=os.getenv("DB_HOST"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        database=os.getenv("DB_NAME"),
+        port=os.getenv("DB_PORT")
+    )
+
+    if db_pool:
+        print("Connection pool created successfully")
+
+except psycopg2.DatabaseError as e:
+    print(f"Error creating connection pool: {e}")
+
+
+# Function to call the PostgreSQL stored function and insert an order item
 def insert_order_item(food_item, quantity, order_id):
+    conn = None
     try:
-        cursor = cnx.cursor()
+        conn = db_pool.getconn()
+        cursor = conn.cursor()
 
-        # Calling the stored procedure
-        cursor.callproc('insert_order_item', (food_item, quantity, order_id))
+        # Calling the function using SELECT
+        cursor.execute("CALL public.insert_order_item(%s, %s, %s);", (food_item, int(quantity), order_id))
 
         # Committing the changes
-        cnx.commit()
+        conn.commit()
 
         # Closing the cursor
         cursor.close()
 
         print("Order item inserted successfully!")
-
         return 1
 
     except psycopg2.Error as err:
         print(f"Error inserting order item: {err}")
 
         # Rollback changes if necessary
-        cnx.rollback()
-
+        if conn:
+            conn.rollback()
         return -1
 
     except Exception as e:
         print(f"An error occurred: {e}")
-        # Rollback changes if necessary
-        cnx.rollback()
-
+        if conn:
+            conn.rollback()
         return -1
+
+    finally:
+        if conn:
+            db_pool.putconn(conn)
+
 
 # Function to insert a record into the order_tracking table
 def insert_order_tracking(order_id, status):
-    cursor = cnx.cursor()
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        cursor = conn.cursor()
 
-    # Inserting the record into the order_tracking table
-    insert_query = sql.SQL("INSERT INTO order_tracking (order_id, status) VALUES (%s, %s)")
-    cursor.execute(insert_query, (order_id, status))
+        # Inserting the record into the order_tracking table
+        insert_query = "INSERT INTO public.order_tracking (order_id, status) VALUES (%s, %s)"
+        cursor.execute(insert_query, (order_id, status))
 
-    # Committing the changes
-    cnx.commit()
+        # Committing the changes
+        conn.commit()
 
-    # Closing the cursor
-    cursor.close()
+        # Closing the cursor
+        cursor.close()
 
+        print("Order tracking inserted successfully!")
+
+    except psycopg2.Error as err:
+        print(f"Error inserting order tracking: {err}")
+        if conn:
+            conn.rollback()
+
+    finally:
+        if conn:
+            db_pool.putconn(conn)
+
+
+# Function to get the total order price using a PostgreSQL function
 def get_total_order_price(order_id):
-    cursor = cnx.cursor()
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        cursor = conn.cursor()
 
-    # Executing the SQL query to get the total order price
-    query = sql.SQL("SELECT get_total_order_price(%s)").format(sql.Identifier(str(order_id)))
-    cursor.execute(query)
+        # Executing the SQL query to get the total order price
+        cursor.execute("SELECT public.get_total_order_price(%s);", (order_id,))
 
-    # Fetching the result
-    result = cursor.fetchone()[0]
+        # Fetching the result
+        result = cursor.fetchone()[0]
 
-    # Closing the cursor
-    cursor.close()
+        # Closing the cursor
+        cursor.close()
 
-    return result
+        return result
+
+    except psycopg2.Error as err:
+        print(f"Error fetching total order price: {err}")
+        return None
+
+    finally:
+        if conn:
+            db_pool.putconn(conn)
+
 
 # Function to get the next available order_id
 def get_next_order_id():
-    cursor = cnx.cursor()
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        cursor = conn.cursor()
 
-    # Executing the SQL query to get the next available order_id
-    query = sql.SQL("SELECT MAX(order_id) FROM orders")
-    cursor.execute(query)
+        # Executing the SQL query to get the next available order_id
+        cursor.execute("SELECT MAX(order_id) FROM orders;")
 
-    # Fetching the result
-    result = cursor.fetchone()[0]
+        # Fetching the result
+        result = cursor.fetchone()[0]
 
-    # Closing the cursor
-    cursor.close()
+        # Closing the cursor
+        cursor.close()
 
-    # Returning the next available order_id
-    if result is None:
-        return 1
-    else:
-        return result + 1
+        # Returning the next available order_id
+        if result is None:
+            return 1
+        else:
+            return result + 1
+
+    except psycopg2.Error as err:
+        print(f"Error fetching next order ID: {err}")
+        return None
+
+    finally:
+        if conn:
+            db_pool.putconn(conn)
+
 
 # Function to fetch the order status from the order_tracking table
 def get_order_status(order_id):
-    cursor = cnx.cursor()
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        cursor = conn.cursor()
 
-    # Executing the SQL query to fetch the order status
-    query = sql.SQL("SELECT status FROM order_tracking WHERE order_id = %s").format(sql.Identifier(str(order_id)))
-    cursor.execute(query)
+        # Executing the SQL query to fetch the order status
+        cursor.execute("SELECT status FROM order_tracking WHERE order_id = %s;", (order_id,))
 
-    # Fetching the result
-    result = cursor.fetchone()
+        # Fetching the result
+        result = cursor.fetchone()
 
-    # Closing the cursor
-    cursor.close()
+        # Closing the cursor
+        cursor.close()
 
-    # Returning the order status
-    if result:
-        return result[0]
-    else:
+        # Returning the order status
+        if result:
+            return result[0]
+        else:
+            return None
+
+    except psycopg2.Error as err:
+        print(f"Error fetching order status: {err}")
         return None
+
+    finally:
+        if conn:
+            db_pool.putconn(conn)
 
 
 if __name__ == "__main__":
-    print(get_next_order_id())
+    # Example usage
+    next_order_id = get_next_order_id()
+    print(f"Next Order ID: {next_order_id}")
+
+    # Example to insert an order item
+    insert_order_item('Masala Dosa', 1, next_order_id)
