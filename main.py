@@ -35,7 +35,9 @@ async def handle_request(request: Request):
         'order.add - context: ongoing-order': add_to_order,
         'order.remove - context: ongoing-order': remove_from_order,
         'order.complete - context: ongoing-order': complete_order,
-        'track.order - context: ongoing-tracking': track_order
+        'track.order - context: ongoing-tracking': track_order,
+        'cancel.order - context: ongoing-cancelling': cancel_order,
+        'store.hours': store_hours
     }
 
     if intent in intent_handler_dict:
@@ -44,6 +46,15 @@ async def handle_request(request: Request):
         return JSONResponse(content={
             "fulfillmentText": "Intent not recognized"
         })
+
+store_hours_cache = {"open": "9 AM", "close": "9 PM"}
+
+def store_hours(parameters: dict, session_id: str):
+    open_time = store_hours_cache.get("open", "9 AM")
+    close_time = store_hours_cache.get("close", "9 PM")
+    
+    fulfillment_text = f"Our store is open from {open_time} to {close_time} every day."
+    return JSONResponse(content={"fulfillmentText": fulfillment_text})
 
 def save_to_db(order: dict):
     next_order_id = db_helper.get_next_order_id()
@@ -69,8 +80,13 @@ def complete_order(parameters: dict, session_id: str):
     return JSONResponse(content={"fulfillmentText": fulfillment_text})
 
 def add_to_order(parameters: dict, session_id: str):
+    # Check if this is a new order request, reset previous order
+    if 'new order' in parameters.get('order', '').lower():
+        inprogress_orders[session_id] = {}
+        
     food_items = parameters.get("food-item", [])
     quantities = parameters.get("number", [])
+    
     if len(food_items) != len(quantities):
         fulfillment_text = "Sorry I didn't understand. Can you please specify food items and quantities clearly?"
     else:
@@ -118,6 +134,20 @@ def track_order(parameters: dict, session_id: str):
     else:
         fulfillment_text = f"No order found with order id: {order_id}"
     return JSONResponse(content={"fulfillmentText": fulfillment_text})
+
+def cancel_order(parameters: dict, session_id: str):
+    order_id = int(parameters.get('order_id', 0))
+    order_exists = db_helper.check_order_exists(order_id)
+
+    if not order_exists:
+        fulfillment_text = f"No order found with order id: {order_id}"
+    else:
+        db_helper.delete_order(order_id)
+        fulfillment_text = f"Your order with ID {order_id} has been canceled successfully."
+    
+    return JSONResponse(content={"fulfillmentText": fulfillment_text})
+
+
 
 if __name__ == "__main__":
     import uvicorn

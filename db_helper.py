@@ -150,6 +150,78 @@ def get_next_order_id():
         if conn:
             db_pool.putconn(conn)
 
+def update_order_status(order_id, status):
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        cursor = conn.cursor()
+
+        # Update the order status in the order_tracking table
+        update_query = "UPDATE public.order_tracking SET status = %s WHERE order_id = %s"
+        cursor.execute(update_query, (status, order_id))
+
+        # Commit the changes
+        conn.commit()
+
+        # Close the cursor
+        cursor.close()
+
+        print("Order status updated successfully!")
+
+    except psycopg2.Error as err:
+        print(f"Error updating order status: {err}")
+        if conn:
+            conn.rollback()
+
+    finally:
+        if conn:
+            db_pool.putconn(conn)
+
+def check_order_exists(order_id):
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT 1 FROM orders WHERE order_id = %s;", (order_id,))
+        result = cursor.fetchone()
+
+        cursor.close()
+        return result is not None
+
+    except psycopg2.Error as err:
+        print(f"Error checking order existence: {err}")
+        return False
+
+    finally:
+        if conn:
+            db_pool.putconn(conn)
+
+
+def delete_order(order_id):
+    conn = None
+    try:
+        conn = db_pool.getconn()
+        cursor = conn.cursor()
+
+        # Delete the order from order_tracking table
+        cursor.execute("DELETE FROM order_tracking WHERE order_id = %s;", (order_id,))
+        # Delete the order from orders table
+        cursor.execute("DELETE FROM orders WHERE order_id = %s;", (order_id,))
+
+        conn.commit()
+        cursor.close()
+        print(f"Order with ID {order_id} deleted successfully!")
+
+    except psycopg2.Error as err:
+        print(f"Error deleting order: {err}")
+        if conn:
+            conn.rollback()
+
+    finally:
+        if conn:
+            db_pool.putconn(conn)
+
 
 # Function to fetch the order status from the order_tracking table
 def get_order_status(order_id):
