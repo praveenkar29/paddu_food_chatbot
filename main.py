@@ -4,6 +4,10 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 import db_helper
 import generic_helper
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
 
 app = FastAPI()
 
@@ -117,4 +121,4 @@ def track_order(parameters: dict, session_id: str):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="debug")
