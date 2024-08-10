@@ -5,9 +5,6 @@ from dotenv import load_dotenv
 
 # Load environment variables from .env file
 load_dotenv()
-print(os.getenv("DB_HOST"))
-print(os.getenv("DB_USER"))
-# etc.
 
 # Database connection details
 db_pool = None
@@ -29,14 +26,14 @@ except psycopg2.DatabaseError as e:
     print(f"Error creating connection pool: {e}")
 
 
-# Function to call the PostgreSQL stored function and insert an order item
+# Function to call the PostgreSQL stored procedure and insert an order item
 def insert_order_item(food_item, quantity, order_id):
     conn = None
     try:
         conn = db_pool.getconn()
         cursor = conn.cursor()
 
-        # Calling the function using SELECT
+        # Calling the procedure using CALL
         cursor.execute("CALL public.insert_order_item(%s, %s, %s);", (food_item, int(quantity), order_id))
 
         # Committing the changes
